@@ -9,8 +9,6 @@
 #include <thread>
 #include <string>
 
-#include "/Users/adamkapsa/Documents/Python_bruh/Arax_tracking/serialib-master/lib/serialib.cpp"
-
 #include "Serial.h"
 
 std::chrono::steady_clock::time_point last_time_point;
@@ -18,7 +16,7 @@ std::chrono::steady_clock::time_point new_time_point;
 
 cv::Mat image;
 
-cv::VideoCapture cap("/Users/adamkapsa/Documents/Python_bruh/Arax_tracking/Dron_videa/jed.MP4");//"/Users/adamkapsa/Documents/all_desktop/dron_videa/tren05.mp4"
+cv::VideoCapture cap("../Dron_videa/jed.MP4");
 
 int width_trackbox = 20;
 
@@ -79,50 +77,45 @@ void display()
 
 void serialout(cv::Rect trackingBox)
 {
-    serialib serial;
-    const char *SERIAL_PORT = "/dev/cu.usbmodem101";
+    vector1 = {};
 
-    // Connection to serial port
-    char errorOpening = serial.openDevice(SERIAL_PORT, 115200);
+    pom3_i = trackingBox.x - width/2 + trackingBox.width/2;
+    pom4_i = height/2 - trackingBox.y - trackingBox.height/2;
 
-    // If connection fails, return the error code otherwise, display a success message
-    if (errorOpening != 1)
+    if(pom3_i >= 0)
     {
-        printf ("Successful connection to %s\n",SERIAL_PORT);
+        pom3_i += 1000;
     }
     else
     {
-        std::cout << "Error with opening port" << std::endl;
-        return;
+        pom3_i += 1000;
     }
-    // Create an array of bytes
-    unsigned char prime[8] = {1, 3, 5, 7, 11, 13, 17, 19};
-
-    // Write the array on the serial device
-    serial.writeBytes(prime, 8);
-    printf ("Data sent\n");
-
-
-    // vector1 = {};
-
-    // pom3_i = trackingBox.x - width/2 + trackingBox.width/2;
-    // pom4_i = height/2 - trackingBox.y - trackingBox.height/2;
-
-    // vector1.push_back(pom3_i);
-    // vector1.push_back(pom4_i);
+    if(pom4_i >= 0)
+    {
+        pom4_i += 1000;
+    }
+    else
+    {
+        pom4_i += 1000;
+    }
     
-	// if (port.isOpen()) 
-    // {
-    //     for(int j=0; j < int(vector1.size()); j++)
-    //     {
-    //         port.transmitAsync(vector1);
+    vector1.push_back(0);
+    vector1.push_back(pom3_i);
+    vector1.push_back(1);
+    vector1.push_back(pom4_i);
+    vector1.push_back(2);
+    
+	if (port.isOpen()) 
+    {
+        for(int j=0; j < int(vector1.size()); j++)
+        {
+            port.transmitAsync(vector1);
 
-    //     }
-    //     std::cout << "\33[2K\r" << pom3_i << " " << pom4_i << std::flush;
-        
+        }        
         // std::cout << "\33[2K\r" << "----Message sent----" << out << std::flush;
         // out = "";
-	// }
+	}
+    std::cout << "\33[2K\r" << pom3_i << " " << pom4_i << std::flush;
 }
 
 void text(std::string mod, cv::Rect trackingBox)

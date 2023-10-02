@@ -47,9 +47,7 @@ include_directories (${Boost_INCLUDE_DIRS})
 
 
 include_directories( include )
-add_executable(serial /Users/adamkapsa/Documents/Python_bruh/Arax_tracking/arax_System.cpp)
-
-# add_subdirectory("/Users/adamkapsa/Documents/Python_bruh/Arax_tracking/opencv-4.x")
+add_executable(serial ./arax_System.cpp)
 
 target_link_libraries(serial ${Boost_LIBRARIES})
 
