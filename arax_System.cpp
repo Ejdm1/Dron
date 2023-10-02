@@ -16,7 +16,7 @@ std::chrono::steady_clock::time_point new_time_point;
 
 cv::Mat image;
 
-cv::VideoCapture cap("../Dron_videa/jed.MP4");
+cv::VideoCapture cap(1);//"../Dron_videa/jed.MP4"
 
 int width_trackbox = 20;
 
@@ -42,9 +42,8 @@ unsigned int baud = 115200;
 std::vector<uint8_t> vector1;
 serial::Serial port;
 
-std::string message = "";
-
 bool armed = false; //track(false = autoguided / true = manual) manual(false = disarmed / true = armed)
+bool manual_auto = false;
 
 std::string mod = "";
 
@@ -82,29 +81,16 @@ void serialout(cv::Rect trackingBox)
     pom3_i = trackingBox.x - width/2 + trackingBox.width/2;
     pom4_i = height/2 - trackingBox.y - trackingBox.height/2;
 
-    if(pom3_i >= 0)
-    {
-        pom3_i += 1000;
-    }
-    else
-    {
-        pom3_i += 1000;
-    }
-    if(pom4_i >= 0)
-    {
-        pom4_i += 1000;
-    }
-    else
-    {
-        pom4_i += 1000;
-    }
-    
-    vector1.push_back(0);
+    //kód pro převod na úhly(čísla od O - 240)
+    //pom3_i = odchylka od středu (x)
+    //pom4_i = odchylka od středu (y)
+
+    vector1.push_back(253);
     vector1.push_back(pom3_i);
-    vector1.push_back(1);
+    vector1.push_back(254);
     vector1.push_back(pom4_i);
-    vector1.push_back(2);
-    
+    vector1.push_back(255);
+
 	if (port.isOpen()) 
     {
         for(int j=0; j < int(vector1.size()); j++)
@@ -112,18 +98,28 @@ void serialout(cv::Rect trackingBox)
             port.transmitAsync(vector1);
 
         }        
-        // std::cout << "\33[2K\r" << "----Message sent----" << out << std::flush;
-        // out = "";
 	}
-    std::cout << "\33[2K\r" << pom3_i << " " << pom4_i << std::flush;
+
+    std::cout << "\33[2K\r" << std::to_string(vector1[1]) << " " << std::to_string(vector1[3]) << std::flush;
 }
 
-void text(std::string mod, cv::Rect trackingBox)
+void text(cv::Rect trackingBox)
 {
     if(mod == "track")
     {  
         cv::rectangle(image, cv::Point(0, 60), cv::Point(260,270), CV_RGB(20,20,20),-1,cv::LINE_8);
-        if(armed)//false = autoguided, true = tracking
+        if(armed)//false = disarmed, true = armed
+        {
+            cv::putText(image, "Armed", cv::Point(6,160), cv::FONT_HERSHEY_SIMPLEX, .8, CV_RGB(255,0,0), 1);
+            cv::line(image, cv::Point(trackingBox.x + trackingBox.width/2, trackingBox.y + trackingBox.height/2),cv::Point (trackingBox.x + trackingBox.width/2, trackingBox.y + trackingBox.height/2) , CV_RGB(255,0,0), 3, cv::LINE_8);
+        }
+        else
+        {
+            cv::putText(image, "Disarmed", cv::Point(6,160), cv::FONT_HERSHEY_SIMPLEX, .8, CV_RGB(0,255,0), 1);
+            cv::line(image, cv::Point(trackingBox.x + trackingBox.width/2, trackingBox.y + trackingBox.height/2),cv::Point (trackingBox.x + trackingBox.width/2, trackingBox.y + trackingBox.height/2) , CV_RGB(0,255,0), 3, cv::LINE_8);
+        }
+
+        if(manual_auto)//false = autoguided, true = tracking
         {
             cv::putText(image, "Mode: Tracking", cv::Point(6,100), cv::FONT_HERSHEY_SIMPLEX, .8, CV_RGB(255,255,255), 1);
             cv::line(image, cv::Point(0,height/2), cv::Point(width,height/2), CV_RGB(255,255,255), 1, cv::LINE_8);
@@ -134,34 +130,32 @@ void text(std::string mod, cv::Rect trackingBox)
             cv::putText(image, "Mode: Auto guided", cv::Point(6,100), cv::FONT_HERSHEY_SIMPLEX, .8, CV_RGB(255,255,255), 1);
         }
 
-        cv::putText(image, "Armed", cv::Point(6,160), cv::FONT_HERSHEY_SIMPLEX, .8, CV_RGB(255,0,0), 1);
+
         cv::putText(image, "Fps: " + std::to_string(fps), cv::Point(6,250), cv::FONT_HERSHEY_SIMPLEX, .8, CV_RGB(255,255,255), 1);
 
         pom1_i = trackingBox.x - width/2 + trackingBox.width/2;
         pom2_i = height/2 - trackingBox.y - trackingBox.height/2;
 
-        cv::line(image, cv::Point(trackingBox.x + trackingBox.width/2, trackingBox.y + trackingBox.height/2),cv::Point (trackingBox.x + trackingBox.width/2, trackingBox.y + trackingBox.height/2) , CV_RGB(255,0,0), 3, cv::LINE_8);
-
         cv::putText(image, "Offset X:" + std::to_string(pom1_i), cv::Point(6,190), cv::FONT_HERSHEY_SIMPLEX, .8, CV_RGB(255,255,255), 1);
         cv::putText(image, "Offset Y:" + std::to_string(pom2_i), cv::Point(6,220), cv::FONT_HERSHEY_SIMPLEX, .8, CV_RGB(255,255,255), 1);
     }
 
-    if(mod == "manuald")
+    if(mod == "manual")
     {
         cv::rectangle(image, cv::Point(0, 60), cv::Point(200,190), CV_RGB(20,20,20),-1,cv::LINE_8);
         cv::putText(image, "Mode: Manual", cv::Point(6,100), cv::FONT_HERSHEY_SIMPLEX, .8, CV_RGB(255,255,255), 1);
-        cv::putText(image, "Disarmed", cv::Point(6,130), cv::FONT_HERSHEY_SIMPLEX, .8, CV_RGB(0,255,0), 2);
-        cv::rectangle(image, cv::Point(width/2-a,height/2-a), cv::Point(width/2+a,height/2+a), CV_RGB(0,255,0), 1, cv::LINE_8);
-        cv::putText(image, "Fps: " + std::to_string(fps), cv::Point(6,160), cv::FONT_HERSHEY_SIMPLEX, 1.3, CV_RGB(255,255,255), 1);
-    }
+        cv::putText(image, "Fps: " + std::to_string(fps), cv::Point(6,160), cv::FONT_HERSHEY_SIMPLEX, .8, CV_RGB(255,255,255), 1);
 
-    else if(mod == "manuala")
-    {
-        cv::rectangle(image, cv::Point(0, 60), cv::Point(200,190), CV_RGB(20,20,20),-1,cv::LINE_8);
-        cv::putText(image, "Mode: Manual", cv::Point(6,100), cv::FONT_HERSHEY_SIMPLEX, .8, CV_RGB(255,255,255), 1);
-        cv::putText(image, "Armed", cv::Point(6,130), cv::FONT_HERSHEY_SIMPLEX, .8, CV_RGB(255,0,0), 2);
-        cv::rectangle(image, cv::Point(width/2-a,height/2-a), cv::Point(width/2+a,height/2+a), CV_RGB(255,0,0), 1, cv::LINE_8);
-        cv::putText(image, "Fps: " + std::to_string(fps), cv::Point(6,160), cv::FONT_HERSHEY_SIMPLEX, 1.3, CV_RGB(255,255,255), 1);
+        if(armed)
+        {
+            cv::putText(image, "Armed", cv::Point(6,130), cv::FONT_HERSHEY_SIMPLEX, .8, CV_RGB(255,0,0), 2);
+            cv::rectangle(image, cv::Point(width/2-a,height/2-a), cv::Point(width/2+a,height/2+a), CV_RGB(255,0,0), 1, cv::LINE_8);
+        }
+        else
+        {
+            cv::putText(image, "Disarmed", cv::Point(6,130), cv::FONT_HERSHEY_SIMPLEX, .8, CV_RGB(0,255,0), 2);
+            cv::rectangle(image, cv::Point(width/2-a,height/2-a), cv::Point(width/2+a,height/2+a), CV_RGB(0,255,0), 1, cv::LINE_8);
+        }
     }
 }
 
@@ -188,13 +182,11 @@ void manual(std::string& mod)
         {
             if(armed == false)
             {
-                mod = "manuald";
                 armed = true;
             }
 
             else if(armed == true)
-            {
-                mod = "manuala";
+            {   
                 armed = false;
             }
         }
@@ -209,7 +201,7 @@ void manual(std::string& mod)
             key_off = true;
             return;
         }
-        text(mod, trackingBox);
+        text(trackingBox);
         display();
 
         new_time_point = std::chrono::steady_clock::now();
@@ -217,7 +209,7 @@ void manual(std::string& mod)
     }
 }
 
-void track_update(cv::Mat image, cv::Rect& trackingBox, cv::Ptr<cv::Tracker> tracker, bool& track_turn_off)
+void track_update(cv::Rect& trackingBox, cv::Ptr<cv::Tracker> tracker, bool& track_turn_off)
 {
     if(tracker->update(image, trackingBox))
     {
@@ -242,9 +234,9 @@ void track(cv::Rect& trackingBox, std::string& mod)
 
         cap >> image;
 
-        std::thread t1(text, mod, trackingBox);
+        std::thread t1(text, trackingBox);
         std::thread t2(serialout, trackingBox);
-        std::thread t3(track_update, image, std::ref(trackingBox), tracker, std::ref(track_turn_off));
+        std::thread t3(track_update, std::ref(trackingBox), tracker, std::ref(track_turn_off));
 
         t3.join();
         t2.join();
@@ -266,6 +258,19 @@ void track(cv::Rect& trackingBox, std::string& mod)
             track_turn_off = false;
             cv::destroyAllWindows();
             return;
+        }
+
+        if(key == 114)
+        {
+            if(manual_auto == false)
+            {
+                manual_auto = true;
+            }
+
+            else if(manual_auto == true)
+            {
+                manual_auto = false;
+            }
         }
 
         if(key == 97)
@@ -308,6 +313,8 @@ void track_box_mouse_movement(int event, int x, int y, int flags, void* userdata
     if(key == 116)
     {
         mod = "track";
+        armed = false;
+        manual_auto = false;
         track(trackingBox, mod);
     }
 }
@@ -317,6 +324,7 @@ int main()
     try
     {
         port.open(comport, baud);
+        std::cout << "Port otevřen" << std::endl;
     }
     catch(...)
     {
@@ -327,7 +335,7 @@ int main()
     {   
         last_time_point = std::chrono::steady_clock::now();
 
-        text(mod,trackingBox);
+        text(trackingBox);
 
         left_top.x = center.x - width_trackbox;
         left_top.y = center.y - width_trackbox;
@@ -417,6 +425,8 @@ int main()
         if(key == 116)
         {   
             mod = "track";
+            armed = false;
+            manual_auto = false;
             track(trackingBox, mod);
         }
 
@@ -428,7 +438,7 @@ int main()
         
         if(key == 109)
         {
-            mod = "manuald";
+            mod = "manual";
             manual(mod);
         }
 
