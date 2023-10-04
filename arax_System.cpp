@@ -18,7 +18,7 @@ std::chrono::steady_clock::time_point new_time_point;
 cv::Mat image;
 cv::Mat imageToShow;
 
-cv::VideoCapture cap("../Dron_videa/jed.MP4");//"../Dron_videa/jed.MP4"
+cv::VideoCapture cap;
 
 int width_trackbox = 20;
 
@@ -29,12 +29,10 @@ cv::Rect trackingBox;
 
 bool track_turn_off = false;
 
-std::string out = "";
+int width;
+int height;
 
-int width = cap.get(cv::CAP_PROP_FRAME_WIDTH);
-int height = cap.get(cv::CAP_PROP_FRAME_HEIGHT);
-
-cv::Point center(width/2,height/2);
+cv::Point center;
 
 //-------------------------------------------------------------------------------------------------------------------------------
 //Sending trough serial port
@@ -61,12 +59,12 @@ int fps = 0;
 
 void Fps()
 {
-    if(cap.get(cv::CAP_PROP_FPS) != 24)
-    {
-        using FpMilliseconds = std::chrono::duration<float, std::chrono::milliseconds::period>;
-        float delta_time = std::chrono::duration_cast<FpMilliseconds>(new_time_point - last_time_point).count() * 0.001f;
-        usleep(((delta_time + (0.041666f - delta_time))*1000)*100);
-    }
+    // if(cap.get(cv::CAP_PROP_FPS) != 24)
+    // {
+    //     using FpMilliseconds = std::chrono::duration<float, std::chrono::milliseconds::period>;
+    //     float delta_time = std::chrono::duration_cast<FpMilliseconds>(new_time_point - last_time_point).count() * 0.001f;
+    //     usleep((delta_time + (0.041666f - delta_time))*1000);
+    // }
 
     new_time_point = std::chrono::steady_clock::now();
     using FpMilliseconds = std::chrono::duration<float, std::chrono::milliseconds::period>;
@@ -77,7 +75,18 @@ void Fps()
 
 void display()
 {
-    cv::resize(image, imageToShow, cv::Size(2560,1440));
+    if(height > 480)
+    {
+        cv::resize(image, imageToShow, cv::Size(width*2,height*2));
+    }
+    else if(height <= 480)
+    {
+        cv::resize(image, imageToShow, cv::Size(width*3,height*3));
+    }
+    else
+    {
+        imageToShow = image;
+    }
     // cv::namedWindow("Arax", cv::WND_PROP_FULLSCREEN);
     // cv::setWindowProperty("Arax",cv::WND_PROP_FULLSCREEN,cv::WINDOW_FULLSCREEN);
     cv::imshow("Arax", imageToShow);
@@ -96,7 +105,7 @@ void serialout(cv::Rect trackingBox)
         //pom3_i = odchylka od středu (x)
         //pom4_i = odchylka od středu (y)
 
-        if (port.isOpen()) 
+        if(port.isOpen()) 
         {
             for(int j=0; j < int(vector1.size()); j++)
             {
@@ -105,20 +114,19 @@ void serialout(cv::Rect trackingBox)
             }        
         }
 
-        std::cout << "\33[2K\r" << std::to_string(vector1[1]) << " " << std::to_string(vector1[3]) << std::flush;
+        //std::cout << "\33[2K\r" << std::to_string(vector1[1]) << " " << std::to_string(vector1[3]) << std::flush;
     }
-    if (mod == "manual")
+    if(mod == "manual")
     {
-        if (port.isOpen()) 
+        if(port.isOpen()) 
         {
             for(int j=0; j < int(vector1.size()); j++)
             {
                 port.transmitAsync(vector1);
-
             }        
         }
 
-        std::cout << "\33[2K\r" << std::to_string(vector1[1]) << " " << std::to_string(vector1[3]) << std::flush;   
+        //std::cout << "\33[2K\r" << std::to_string(vector1[1]) << " " << std::to_string(vector1[3]) << std::flush;   
     }
 }
 
@@ -275,12 +283,12 @@ void track(cv::Rect& trackingBox, std::string& mod)
         cap >> image;
 
         std::thread t1(text, trackingBox);
-        // std::thread t2(serialout, trackingBox);
+        std::thread t2(serialout, trackingBox);
         std::thread t3(track_update, std::ref(trackingBox), tracker, std::ref(track_turn_off));
         // std::thread t4(resize, image, std::ref(imageToShow));
 
         t3.join();
-        // t2.join();
+        t2.join();
         t1.join();
         // t4.join();
 
@@ -349,29 +357,59 @@ void track_box_mouse_movement(int event, int x, int y, int flags, void* userdata
     key = cv::waitKey(1);
     if(event == cv::EVENT_MOUSEMOVE && key == 101)
     {
-        center.x = (x/32)*16;
-        center.y = (y/32)*16;
+        if(height > 480)
+        {
+            center.x = x/2;
+            center.y = y/2;
+        }
+        else if(height <= 480)
+        {
+            center.x = x/3;
+            center.y = y/3;
+        }
+        else
+        {
+            center.x = x;
+            center.y = y;
+        }
     }
     if(key == 116)
     {
         mod = "track";
         armed = false;
         manual_auto = false;
-        track(trackingBox, mod);
+        cv::setMouseCallback("Arax",NULL);
     }
 }
 
 int main() 
 {
-    // try
-    // {
-    //     port.open(comport, baud);
-    //     std::cout << "Port otevřen" << std::endl;
-    // }
-    // catch(...)
-    // {
-    //     std::cout << "Port nelze otevřít" << std::endl;
-    // }
+    try
+    {
+        cap = cv::VideoCapture("../Dron_videa/jed.MP4"); //"../Dron_videa/jed.MP4"
+    }
+    catch(...)
+    {
+        cap = cv::VideoCapture(1);
+    }
+    
+    width = cap.get(cv::CAP_PROP_FRAME_WIDTH);
+    height = cap.get(cv::CAP_PROP_FRAME_HEIGHT);
+
+    center.x = width/2;
+    center.y = height/2;
+
+
+    try
+    {
+        port.open(comport, baud);
+        std::cout << "Port otevřen" << std::endl;
+    }
+    catch(...)
+    {
+        std::cout << "Port nelze otevřít" << std::endl;
+    }
+
     std::cout << "Cap fps: " << cap.get(cv::CAP_PROP_FPS) << std::endl;
 
     while (true)
@@ -459,8 +497,9 @@ int main()
             center.x -= 10;
         }
         
-        if(key == 116)
+        if(key == 116 || mod == "track")
         {   
+            cv::setMouseCallback("Arax",NULL);
             mod = "track";
             armed = false;
             manual_auto = false;
@@ -475,6 +514,7 @@ int main()
         
         if(key == 109)
         {
+            cv::setMouseCallback("Arax",NULL);
             mod = "manual";
             manual(mod);
         }
@@ -495,4 +535,3 @@ int main()
 // // left top corner of monitor [0,0]
 // // right down corner of monitor [1200,650]
 // //'/dev/cu.usbmodem101'
-// //message looks " * message @ message2 # "
