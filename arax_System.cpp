@@ -8,6 +8,7 @@
 #include <sstream>
 #include <thread>
 #include <string>
+#include <unistd.h>
 
 #include "Serial.h"
 
@@ -15,8 +16,9 @@ std::chrono::steady_clock::time_point last_time_point;
 std::chrono::steady_clock::time_point new_time_point;
 
 cv::Mat image;
+cv::Mat imageToShow;
 
-cv::VideoCapture cap(1);//"../Dron_videa/jed.MP4"
+cv::VideoCapture cap("../Dron_videa/jed.MP4");//"../Dron_videa/jed.MP4"
 
 int width_trackbox = 20;
 
@@ -49,12 +51,8 @@ std::string mod = "";
 
 //--------------------------------------------------------------------------------------------------------------------------------
 
-int pom1_i = 0;
-int pom2_i = 0;
 int pom3_i = 0;
 int pom4_i = 0;
-
-int a = 2; //velikost zaměřovače v manuálu
 
 int key;
 bool key_off = false;
@@ -63,6 +61,14 @@ int fps = 0;
 
 void Fps()
 {
+    if(cap.get(cv::CAP_PROP_FPS) != 24)
+    {
+        using FpMilliseconds = std::chrono::duration<float, std::chrono::milliseconds::period>;
+        float delta_time = std::chrono::duration_cast<FpMilliseconds>(new_time_point - last_time_point).count() * 0.001f;
+        usleep(((delta_time + (0.041666f - delta_time))*1000)*100);
+    }
+
+    new_time_point = std::chrono::steady_clock::now();
     using FpMilliseconds = std::chrono::duration<float, std::chrono::milliseconds::period>;
     float delta_time = std::chrono::duration_cast<FpMilliseconds>(new_time_point - last_time_point).count() * 0.001f;
     last_time_point = new_time_point;
@@ -71,57 +77,73 @@ void Fps()
 
 void display()
 {
-    cv::imshow("Arax", image);
+    cv::resize(image, imageToShow, cv::Size(2560,1440));
+    // cv::namedWindow("Arax", cv::WND_PROP_FULLSCREEN);
+    // cv::setWindowProperty("Arax",cv::WND_PROP_FULLSCREEN,cv::WINDOW_FULLSCREEN);
+    cv::imshow("Arax", imageToShow);
 }
 
 void serialout(cv::Rect trackingBox)
 {
     vector1 = {};
 
-    pom3_i = trackingBox.x - width/2 + trackingBox.width/2;
-    pom4_i = height/2 - trackingBox.y - trackingBox.height/2;
-
-    //kód pro převod na úhly(čísla od O - 240)
-    //pom3_i = odchylka od středu (x)
-    //pom4_i = odchylka od středu (y)
-
-    vector1.push_back(253);
-    vector1.push_back(pom3_i);
-    vector1.push_back(254);
-    vector1.push_back(pom4_i);
-    vector1.push_back(255);
-
-	if (port.isOpen()) 
+    if(mod == "track")
     {
-        for(int j=0; j < int(vector1.size()); j++)
+        pom3_i = trackingBox.x - width/2 + trackingBox.width/2;
+        pom4_i = height/2 - trackingBox.y - trackingBox.height/2;
+
+        //kód pro převod na úhly(čísla od O - 240)
+        //pom3_i = odchylka od středu (x)
+        //pom4_i = odchylka od středu (y)
+
+        if (port.isOpen()) 
         {
-            port.transmitAsync(vector1);
+            for(int j=0; j < int(vector1.size()); j++)
+            {
+                port.transmitAsync(vector1);
 
-        }        
-	}
+            }        
+        }
 
-    std::cout << "\33[2K\r" << std::to_string(vector1[1]) << " " << std::to_string(vector1[3]) << std::flush;
+        std::cout << "\33[2K\r" << std::to_string(vector1[1]) << " " << std::to_string(vector1[3]) << std::flush;
+    }
+    if (mod == "manual")
+    {
+        if (port.isOpen()) 
+        {
+            for(int j=0; j < int(vector1.size()); j++)
+            {
+                port.transmitAsync(vector1);
+
+            }        
+        }
+
+        std::cout << "\33[2K\r" << std::to_string(vector1[1]) << " " << std::to_string(vector1[3]) << std::flush;   
+    }
 }
 
 void text(cv::Rect trackingBox)
 {
     if(mod == "track")
     {  
-        cv::rectangle(image, cv::Point(0, 60), cv::Point(260,270), CV_RGB(20,20,20),-1,cv::LINE_8);
+        cv::rectangle(image, cv::Point(0, 60), cv::Point(260,270), CV_RGB(0,0,0),-1,cv::LINE_8);
         if(armed)//false = disarmed, true = armed
         {
             cv::putText(image, "Armed", cv::Point(6,160), cv::FONT_HERSHEY_SIMPLEX, .8, CV_RGB(255,0,0), 1);
-            cv::line(image, cv::Point(trackingBox.x + trackingBox.width/2, trackingBox.y + trackingBox.height/2),cv::Point (trackingBox.x + trackingBox.width/2, trackingBox.y + trackingBox.height/2) , CV_RGB(255,0,0), 3, cv::LINE_8);
+
+            cv::rectangle(image, cv::Point(trackingBox.x + trackingBox.width/2-1, trackingBox.y + trackingBox.height/2-1),cv::Point (trackingBox.x + trackingBox.width/2+1, trackingBox.y + trackingBox.height/2+1) , CV_RGB(255,0,0), -1, cv::LINE_8);
         }
         else
         {
             cv::putText(image, "Disarmed", cv::Point(6,160), cv::FONT_HERSHEY_SIMPLEX, .8, CV_RGB(0,255,0), 1);
-            cv::line(image, cv::Point(trackingBox.x + trackingBox.width/2, trackingBox.y + trackingBox.height/2),cv::Point (trackingBox.x + trackingBox.width/2, trackingBox.y + trackingBox.height/2) , CV_RGB(0,255,0), 3, cv::LINE_8);
+
+            cv::rectangle(image, cv::Point(trackingBox.x + trackingBox.width/2-1, trackingBox.y + trackingBox.height/2-1),cv::Point (trackingBox.x + trackingBox.width/2+1, trackingBox.y + trackingBox.height/2+1) , CV_RGB(0,255,0), -1, cv::LINE_8);
         }
 
         if(manual_auto)//false = autoguided, true = tracking
         {
             cv::putText(image, "Mode: Tracking", cv::Point(6,100), cv::FONT_HERSHEY_SIMPLEX, .8, CV_RGB(255,255,255), 1);
+
             cv::line(image, cv::Point(0,height/2), cv::Point(width,height/2), CV_RGB(255,255,255), 1, cv::LINE_8);
             cv::line(image, cv::Point(width/2,0), cv::Point(width/2,height), CV_RGB(255,255,255), 1, cv::LINE_8);
         }
@@ -130,32 +152,46 @@ void text(cv::Rect trackingBox)
             cv::putText(image, "Mode: Auto guided", cv::Point(6,100), cv::FONT_HERSHEY_SIMPLEX, .8, CV_RGB(255,255,255), 1);
         }
 
-
         cv::putText(image, "Fps: " + std::to_string(fps), cv::Point(6,250), cv::FONT_HERSHEY_SIMPLEX, .8, CV_RGB(255,255,255), 1);
 
-        pom1_i = trackingBox.x - width/2 + trackingBox.width/2;
-        pom2_i = height/2 - trackingBox.y - trackingBox.height/2;
+        pom3_i = trackingBox.x - width/2 + trackingBox.width/2;
+        pom4_i = height/2 - trackingBox.y - trackingBox.height/2;
 
-        cv::putText(image, "Offset X:" + std::to_string(pom1_i), cv::Point(6,190), cv::FONT_HERSHEY_SIMPLEX, .8, CV_RGB(255,255,255), 1);
-        cv::putText(image, "Offset Y:" + std::to_string(pom2_i), cv::Point(6,220), cv::FONT_HERSHEY_SIMPLEX, .8, CV_RGB(255,255,255), 1);
+        cv::putText(image, "Offset X:" + std::to_string(pom3_i), cv::Point(6,190), cv::FONT_HERSHEY_SIMPLEX, .8, CV_RGB(255,255,255), 1);
+        cv::putText(image, "Offset Y:" + std::to_string(pom4_i), cv::Point(6,220), cv::FONT_HERSHEY_SIMPLEX, .8, CV_RGB(255,255,255), 1);
     }
 
     if(mod == "manual")
     {
-        cv::rectangle(image, cv::Point(0, 60), cv::Point(200,190), CV_RGB(20,20,20),-1,cv::LINE_8);
+        cv::rectangle(image, cv::Point(0, 60), cv::Point(200,190), CV_RGB(0,0,0),-1,cv::LINE_8);
+
         cv::putText(image, "Mode: Manual", cv::Point(6,100), cv::FONT_HERSHEY_SIMPLEX, .8, CV_RGB(255,255,255), 1);
+
         cv::putText(image, "Fps: " + std::to_string(fps), cv::Point(6,160), cv::FONT_HERSHEY_SIMPLEX, .8, CV_RGB(255,255,255), 1);
+
+        cv::line(image, cv::Point(0,height/2),cv::Point(width,height/2) , CV_RGB(255,255,255), 1, cv::LINE_8);
+        cv::line(image, cv::Point(width/2,0),cv::Point(width/2,height) , CV_RGB(255,255,255), 1, cv::LINE_8);
 
         if(armed)
         {
             cv::putText(image, "Armed", cv::Point(6,130), cv::FONT_HERSHEY_SIMPLEX, .8, CV_RGB(255,0,0), 2);
-            cv::rectangle(image, cv::Point(width/2-a,height/2-a), cv::Point(width/2+a,height/2+a), CV_RGB(255,0,0), 1, cv::LINE_8);
+            cv::rectangle(image, cv::Point(width/2-2,height/2-2), cv::Point(width/2+2,height/2+2), CV_RGB(255,0,0), 1, cv::LINE_8);
         }
         else
         {
             cv::putText(image, "Disarmed", cv::Point(6,130), cv::FONT_HERSHEY_SIMPLEX, .8, CV_RGB(0,255,0), 2);
-            cv::rectangle(image, cv::Point(width/2-a,height/2-a), cv::Point(width/2+a,height/2+a), CV_RGB(0,255,0), 1, cv::LINE_8);
+            cv::rectangle(image, cv::Point(width/2-2,height/2-2), cv::Point(width/2+2,height/2+2), CV_RGB(0,255,0), 1, cv::LINE_8);
         }
+    }
+
+    if(mod == "main")
+    {
+        cv::rectangle(image, trackingBox, CV_RGB(255, 255, 255),2, 8);
+
+        cv::line(image, cv::Point (trackingBox.x + trackingBox.width/2, trackingBox.y + trackingBox.height/2),cv::Point (trackingBox.x + trackingBox.width/2, trackingBox.y + trackingBox.height/2) , CV_RGB(255,0,0), 5, cv::LINE_8);
+
+        cv::rectangle(image, cv::Point(0,70), cv::Point(120,110), CV_RGB(0,0,0),-1,cv::LINE_8);
+        cv::putText(image, "Fps: " + std::to_string(fps), cv::Point(6,100), cv::FONT_HERSHEY_SIMPLEX, .8, CV_RGB(255,255,255), 1);
     }
 }
 
@@ -167,8 +203,6 @@ void manual(std::string& mod)
 
         cap >> image;
 
-        cv::line(image, cv::Point(0,height/2),cv::Point(width,height/2) , CV_RGB(255,255,255), 1, cv::LINE_8);
-        cv::line(image, cv::Point(width/2,0),cv::Point(width/2,height) , CV_RGB(255,255,255), 1, cv::LINE_8);
         try
         {
             key = cv::waitKey(1);
@@ -202,6 +236,7 @@ void manual(std::string& mod)
             return;
         }
         text(trackingBox);
+        // cv::resize(image, imageToShow, cv::Size(2560,1600), cv::INTER_LINEAR);
         display();
 
         new_time_point = std::chrono::steady_clock::now();
@@ -222,25 +257,32 @@ void track_update(cv::Rect& trackingBox, cv::Ptr<cv::Tracker> tracker, bool& tra
     //std::cout << trackingBox << std::endl;
 }
 
+// void resize(cv::Mat image, cv::Mat& imageToShow)
+// {
+//     cv::resize(image, imageToShow, cv::Size(2560,1600), cv::INTER_LINEAR);
+// }
+
 void track(cv::Rect& trackingBox, std::string& mod)
 {
     cv::Ptr<cv::Tracker> tracker = cv::TrackerCSRT::create();
 
     tracker->init(image, trackingBox);
 
-    while (true) 
+    while (true)
     {
         last_time_point = std::chrono::steady_clock::now();
 
         cap >> image;
 
         std::thread t1(text, trackingBox);
-        std::thread t2(serialout, trackingBox);
+        // std::thread t2(serialout, trackingBox);
         std::thread t3(track_update, std::ref(trackingBox), tracker, std::ref(track_turn_off));
+        // std::thread t4(resize, image, std::ref(imageToShow));
 
         t3.join();
-        t2.join();
+        // t2.join();
         t1.join();
+        // t4.join();
 
         display();
 
@@ -307,8 +349,8 @@ void track_box_mouse_movement(int event, int x, int y, int flags, void* userdata
     key = cv::waitKey(1);
     if(event == cv::EVENT_MOUSEMOVE && key == 101)
     {
-        center.x = x;
-        center.y = y;
+        center.x = (x/32)*16;
+        center.y = (y/32)*16;
     }
     if(key == 116)
     {
@@ -321,38 +363,33 @@ void track_box_mouse_movement(int event, int x, int y, int flags, void* userdata
 
 int main() 
 {
-    try
-    {
-        port.open(comport, baud);
-        std::cout << "Port otevřen" << std::endl;
-    }
-    catch(...)
-    {
-        std::cout << "Port nelze otevřít" << std::endl;
-    }
+    // try
+    // {
+    //     port.open(comport, baud);
+    //     std::cout << "Port otevřen" << std::endl;
+    // }
+    // catch(...)
+    // {
+    //     std::cout << "Port nelze otevřít" << std::endl;
+    // }
+    std::cout << "Cap fps: " << cap.get(cv::CAP_PROP_FPS) << std::endl;
 
     while (true)
     {   
         last_time_point = std::chrono::steady_clock::now();
+        mod = "main";
 
-        text(trackingBox);
+        cap >> image;
 
         left_top.x = center.x - width_trackbox;
         left_top.y = center.y - width_trackbox;
 
         right_down.x = width_trackbox + center.x;
         right_down.y = width_trackbox + center.y;
-
-        cap >> image;
         
         cv::Rect trackingBox(left_top, right_down);
 
-        cv::rectangle(image, trackingBox, cv::Scalar(255, 255, 255),2, 8);
-
-        cv::line(image, cv::Point (trackingBox.x + trackingBox.width/2, trackingBox.y + trackingBox.height/2),cv::Point (trackingBox.x + trackingBox.width/2, trackingBox.y + trackingBox.height/2) , CV_RGB(255,0,0), 5, cv::LINE_8);
-
-        cv::rectangle(image, cv::Point(0,70), cv::Point(120,110), CV_RGB(20,20,20),-1,cv::LINE_8);
-        cv::putText(image, "Fps: " + std::to_string(fps), cv::Point(6,100), cv::FONT_HERSHEY_SIMPLEX, .8, CV_RGB(255,255,255), 1);
+        text(trackingBox);
 
         display();
 

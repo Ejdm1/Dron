@@ -58,6 +58,7 @@
         "memory_resource": "cpp",
         "random": "cpp",
         "utility": "cpp",
-        "cinttypes": "cpp"
+        "cinttypes": "cpp",
+        "*.ipp": "cpp"
     }
 }
