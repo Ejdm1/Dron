@@ -56,19 +56,13 @@ int key;
 bool key_off = false;
 
 int fps = 0;
+float delta_time;
 
 void Fps()
 {
-    // if(cap.get(cv::CAP_PROP_FPS) != 24)
-    // {
-    //     using FpMilliseconds = std::chrono::duration<float, std::chrono::milliseconds::period>;
-    //     float delta_time = std::chrono::duration_cast<FpMilliseconds>(new_time_point - last_time_point).count() * 0.001f;
-    //     usleep((delta_time + (0.041666f - delta_time))*1000);
-    // }
-
     new_time_point = std::chrono::steady_clock::now();
     using FpMilliseconds = std::chrono::duration<float, std::chrono::milliseconds::period>;
-    float delta_time = std::chrono::duration_cast<FpMilliseconds>(new_time_point - last_time_point).count() * 0.001f;
+    delta_time = std::chrono::duration_cast<FpMilliseconds>(new_time_point - last_time_point).count() * 0.001f;
     last_time_point = new_time_point;
     fps = 1000 / (delta_time * 1000);
 }
@@ -87,8 +81,6 @@ void display()
     {
         imageToShow = image;
     }
-    // cv::namedWindow("Arax", cv::WND_PROP_FULLSCREEN);
-    // cv::setWindowProperty("Arax",cv::WND_PROP_FULLSCREEN,cv::WINDOW_FULLSCREEN);
     cv::imshow("Arax", imageToShow);
 }
 
@@ -110,11 +102,9 @@ void serialout(cv::Rect trackingBox)
             for(int j=0; j < int(vector1.size()); j++)
             {
                 port.transmitAsync(vector1);
-
-            }        
+            }   
+            std::cout << "\33[2K\r" << std::to_string(vector1[1]) << " " << std::to_string(vector1[3]) << std::flush;     
         }
-
-        //std::cout << "\33[2K\r" << std::to_string(vector1[1]) << " " << std::to_string(vector1[3]) << std::flush;
     }
     if(mod == "manual")
     {
@@ -123,10 +113,9 @@ void serialout(cv::Rect trackingBox)
             for(int j=0; j < int(vector1.size()); j++)
             {
                 port.transmitAsync(vector1);
-            }        
+            }    
+            std::cout << "\33[2K\r" << std::to_string(vector1[1]) << " " << std::to_string(vector1[3]) << std::flush;       
         }
-
-        //std::cout << "\33[2K\r" << std::to_string(vector1[1]) << " " << std::to_string(vector1[3]) << std::flush;   
     }
 }
 
@@ -244,7 +233,6 @@ void manual(std::string& mod)
             return;
         }
         text(trackingBox);
-        // cv::resize(image, imageToShow, cv::Size(2560,1600), cv::INTER_LINEAR);
         display();
 
         new_time_point = std::chrono::steady_clock::now();
@@ -262,13 +250,7 @@ void track_update(cv::Rect& trackingBox, cv::Ptr<cv::Tracker> tracker, bool& tra
     {
         track_turn_off = true;
     }
-    //std::cout << trackingBox << std::endl;
 }
-
-// void resize(cv::Mat image, cv::Mat& imageToShow)
-// {
-//     cv::resize(image, imageToShow, cv::Size(2560,1600), cv::INTER_LINEAR);
-// }
 
 void track(cv::Rect& trackingBox, std::string& mod)
 {
@@ -285,12 +267,10 @@ void track(cv::Rect& trackingBox, std::string& mod)
         std::thread t1(text, trackingBox);
         std::thread t2(serialout, trackingBox);
         std::thread t3(track_update, std::ref(trackingBox), tracker, std::ref(track_turn_off));
-        // std::thread t4(resize, image, std::ref(imageToShow));
 
         t3.join();
         t2.join();
         t1.join();
-        // t4.join();
 
         display();
 
@@ -511,7 +491,6 @@ int main()
             cv::setMouseCallback("Arax", track_box_mouse_movement, NULL);
         }
     
-        
         if(key == 109)
         {
             cv::setMouseCallback("Arax",NULL);
