@@ -37,7 +37,7 @@ cv::Point center;
 //-------------------------------------------------------------------------------------------------------------------------------
 //Sending trough serial port
 
-std::string comport = "/dev/cu.usbmodem101";
+std::string comport = "/dev/cu.usbserial-10";
 unsigned int baud = 115200;
 std::vector<uint8_t> vector1;
 serial::Serial port;
@@ -99,22 +99,42 @@ void serialout(cv::Rect trackingBox)
 
         if(port.isOpen()) 
         {
+            vector1.push_back(255);//start
+            vector1.push_back(1);//servo 1
+            vector1.push_back(2);//servo 2
+            vector1.push_back(3);//servo 3
+            vector1.push_back(4);//servo 4
+            vector1.push_back(manual_auto); //manual_auto = 1,0 (track is guided or just tracking)
+            vector1.push_back(armed);//armed = 1,0
+            vector1.push_back(253);//mod = track = 253
+            vector1.push_back(254);//end
+
             for(int j=0; j < int(vector1.size()); j++)
             {
                 port.transmitAsync(vector1);
             }   
-            std::cout << "\33[2K\r" << std::to_string(vector1[1]) << " " << std::to_string(vector1[3]) << std::flush;     
+            std::cout << "\33[2K\r" << std::to_string(vector1[1]) << " s1 " << std::to_string(vector1[2]) << " s2 " << std::to_string(vector1[3]) << " s3 " << std::to_string(vector1[4]) << " s4 " << std::to_string(vector1[5]) << " autoguided or just tracking " << std::to_string(vector1[6]) << " armed " << std::to_string(vector1[7]) << " mod --- message sent ---" << std::flush;          
         }
     }
     if(mod == "manual")
     {
         if(port.isOpen()) 
         {
+            vector1.push_back(255);//start
+            vector1.push_back(1);//servo1
+            vector1.push_back(2);//servo2
+            vector1.push_back(3);//servo3
+            vector1.push_back(4);//servo4
+            vector1.push_back(250);//free
+            vector1.push_back(armed);//armed = 1,0
+            vector1.push_back(252);//mod = manual = 252
+            vector1.push_back(254);//end
+
             for(int j=0; j < int(vector1.size()); j++)
             {
                 port.transmitAsync(vector1);
             }    
-            std::cout << "\33[2K\r" << std::to_string(vector1[1]) << " " << std::to_string(vector1[3]) << std::flush;       
+            std::cout << "\33[2K\r" << std::to_string(vector1[1]) << " s1 " << std::to_string(vector1[2]) << " s2 " << std::to_string(vector1[3]) << " s3 " << std::to_string(vector1[4]) << " s4 " << std::to_string(vector1[5]) << " free " << std::to_string(vector1[6]) << " armed " << std::to_string(vector1[7]) << " mod --- message sent ---" << std::flush;          
         }
     }
 }
@@ -232,6 +252,7 @@ void manual(std::string& mod)
             key_off = true;
             return;
         }
+        serialout(trackingBox);
         text(trackingBox);
         display();
 

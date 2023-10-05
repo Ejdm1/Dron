@@ -4,7 +4,6 @@ project(serial)
 
 set(CMAKE_CXX_STANDARD 17)
 
-
 if (MSVC)
     set (CMAKE_VERBOSE_MAKEFILE FALSE)
 
@@ -15,7 +14,6 @@ if (MSVC)
         -D_SILENCE_CXX17_ALLOCATOR_VOID_DEPRECATION_WARNING
         -D_SILENCE_CXX17_ADAPTOR_TYPEDEFS_DEPRECATION_WARNING
     )    
-
 
 else()
     set (THREADS_PREFER_PTHREAD_FLAG ON)
@@ -29,8 +27,6 @@ else()
     endif ()
 endif()
 
-
-
 set (Boost_USE_STATIC_LIBS ON)
 set (Boost_USE_STATIC_RUNTIME ON)
 set (Boost_USE_MULTITHREADED ON)
@@ -43,8 +39,6 @@ set (BOOST_INCLUDEDIR "C:\\tools\\vcpkg\\installed\\x86-windows\\include")
 find_package(Boost "1.70.0" COMPONENTS ${BOOST_MANDATORY_COMPONENTS}  REQUIRED)
 set (CMAKE_INCLUDE_CURRENT_DIR ON)
 include_directories (${Boost_INCLUDE_DIRS})
-
-
 
 include_directories( include )
 add_executable(serial ./arax_System.cpp)
