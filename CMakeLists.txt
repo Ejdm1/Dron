@@ -4,6 +4,7 @@ project(serial)
 
 set(CMAKE_CXX_STANDARD 17)
 
+
 if (MSVC)
     set (CMAKE_VERBOSE_MAKEFILE FALSE)
 
