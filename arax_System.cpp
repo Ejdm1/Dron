@@ -37,7 +37,7 @@ cv::Point center;
 //-------------------------------------------------------------------------------------------------------------------------------
 //Sending trough serial port
 
-std::string comport = "/dev/cu.usbserial-10";
+std::string comport = "/dev/cu.usbmodem101";//"/dev/cu.usbserial-10" "/dev/cu.usbmodem101"
 unsigned int baud = 115200;
 std::vector<uint8_t> vector1;
 serial::Serial port;
@@ -387,7 +387,7 @@ int main()
 {
     try
     {
-        cap = cv::VideoCapture("../Dron_videa/jed.MP4"); //"../Dron_videa/jed.MP4"
+        cap = cv::VideoCapture(0); //"../Dron_videa/jed.MP4"
     }
     catch(...)
     {
