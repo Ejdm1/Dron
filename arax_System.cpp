@@ -35,22 +35,23 @@ int height;
 cv::Point center;
 
 //-------------------------------------------------------------------------------------------------------------------------------
-//Sending trough serial port
-
-std::string comport = "/dev/cu.usbmodem101";//"/dev/cu.usbserial-10" "/dev/cu.usbmodem101"
-unsigned int baud = 115200;
+//Sending trough serial port + tolerance setings
 std::vector<uint8_t> vector1;
 serial::Serial port;
 
 bool armed = false; //track(false = autoguided / true = manual) manual(false = disarmed / true = armed)
 bool manual_auto = false;
 
-std::string mod = "";
+long in_min = 0; long out_min = 0; long out_max = 180;
+int smerovka = 90; int zadni = 90; int predni_r = 90; int predni_l = 90;
 
+int tolerance = 2; //tolerance of offset in degrees
+
+std::string mod = "";
 //--------------------------------------------------------------------------------------------------------------------------------
 
-int pom3_i = 0;
-int pom4_i = 0;
+int pom_x = 0;
+int pom_y = 0;
 
 int key;
 bool key_off = false;
@@ -90,20 +91,40 @@ void serialout(cv::Rect trackingBox)
 
     if(mod == "track")
     {
-        pom3_i = trackingBox.x - width/2 + trackingBox.width/2;
-        pom4_i = height/2 - trackingBox.y - trackingBox.height/2;
+        pom_x = trackingBox.x + trackingBox.width/2;
+        pom_y = trackingBox.y - trackingBox.height/2;
 
         //kód pro převod na úhly(čísla od O - 240)
-        //pom3_i = odchylka od středu (x)
-        //pom4_i = odchylka od středu (y)
+        //pom_x = odchylka od středu (x)
+        //pom_y = odchylka od středu (y)
 
         if(port.isOpen()) 
         {
+            //0,1023,13,180
+            //(x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
+
+            smerovka = (pom_x - in_min) * (out_max - out_min) / (2160 - in_min) + out_min;
+            zadni = (pom_y - in_min) * (out_max - out_min) / (1440 - in_min) + out_min;
+
             vector1.push_back(255);//start
-            vector1.push_back(1);//servo 1
-            vector1.push_back(2);//servo 2
-            vector1.push_back(3);//servo 3
-            vector1.push_back(4);//servo 4
+            if(smerovka > 90 + tolerance || smerovka < 90 - tolerance)
+            {
+                vector1.push_back(smerovka);//servo 1
+            }
+            else
+            {
+                vector1.push_back(90);//servo 1   
+            }
+            if(smerovka > 90 + tolerance || smerovka < 90 - tolerance)
+            {
+                vector1.push_back(zadni);//servo 2
+            }
+            else
+            {
+                vector1.push_back(90);//servo 2
+            }
+            vector1.push_back(predni_l);//servo 3
+            vector1.push_back(predni_r);//servo 4
             vector1.push_back(manual_auto); //manual_auto = 1,0 (track is guided or just tracking)
             vector1.push_back(armed);//armed = 1,0
             vector1.push_back(253);//mod = track = 253
@@ -171,11 +192,11 @@ void text(cv::Rect trackingBox)
 
         cv::putText(image, "Fps: " + std::to_string(fps), cv::Point(6,250), cv::FONT_HERSHEY_SIMPLEX, .8, CV_RGB(255,255,255), 1);
 
-        pom3_i = trackingBox.x - width/2 + trackingBox.width/2;
-        pom4_i = height/2 - trackingBox.y - trackingBox.height/2;
+        pom_x = trackingBox.x - width/2 + trackingBox.width/2;
+        pom_y = height/2 - trackingBox.y - trackingBox.height/2;
 
-        cv::putText(image, "Offset X:" + std::to_string(pom3_i), cv::Point(6,190), cv::FONT_HERSHEY_SIMPLEX, .8, CV_RGB(255,255,255), 1);
-        cv::putText(image, "Offset Y:" + std::to_string(pom4_i), cv::Point(6,220), cv::FONT_HERSHEY_SIMPLEX, .8, CV_RGB(255,255,255), 1);
+        cv::putText(image, "Offset X:" + std::to_string(pom_x), cv::Point(6,190), cv::FONT_HERSHEY_SIMPLEX, .8, CV_RGB(255,255,255), 1);
+        cv::putText(image, "Offset Y:" + std::to_string(pom_y), cv::Point(6,220), cv::FONT_HERSHEY_SIMPLEX, .8, CV_RGB(255,255,255), 1);
     }
 
     if(mod == "manual")
@@ -385,6 +406,8 @@ void track_box_mouse_movement(int event, int x, int y, int flags, void* userdata
 
 int main() 
 {
+    //---------------------------------------------------------------------------------
+    //Capture address
     try
     {
         cap = cv::VideoCapture(0); //"../Dron_videa/jed.MP4"
@@ -393,6 +416,7 @@ int main()
     {
         cap = cv::VideoCapture(1);
     }
+    //---------------------------------------------------------------------------------
     
     width = cap.get(cv::CAP_PROP_FRAME_WIDTH);
     height = cap.get(cv::CAP_PROP_FRAME_HEIGHT);
@@ -400,6 +424,10 @@ int main()
     center.x = width/2;
     center.y = height/2;
 
+    //---------------------------------------------------------------------------------
+    //Serial boud, port
+    std::string comport = "/dev/cu.usbmodem101";//"/dev/cu.usbserial-10" "/dev/cu.usbmodem101"
+    unsigned int baud = 115200;
 
     try
     {
@@ -410,6 +438,7 @@ int main()
     {
         std::cout << "Port nelze otevřít" << std::endl;
     }
+    //--------------------------------------------------------------------------------
 
     std::cout << "Cap fps: " << cap.get(cv::CAP_PROP_FPS) << std::endl;
 
